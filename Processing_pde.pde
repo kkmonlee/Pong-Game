@@ -1,55 +1,67 @@
 import processing.serial.*;
 
-String serialPortName = "/dev/ttyACM0";
+// This will change depending on the system
+String port = "/dev/ttyACM0";
+
 Serial arduino;
-PImage ball, bat_p1, bat_p2, back;
-float bat_p1_Position, bat_p2_Position;
+
+// Initialising image instances
+PImage ball, player1Bat, player2Bat, background;
+
+// Variables for core functionality
+float player1Bat_Position, player2Bat_Position;
 float ballX, ballY;
-float vertSpeed, horiSpeed;
+float vertical, horizontal;
 String[] value;
-int p1_score=0;
-int p2_score=0;
-PFont f;
+int p1Score=0;
+int p2Score=0;
 int count=0;
+
+
+// Font for player score
+PFont f;
 
 void setup()
 {
-  size(960,720);
-  if(serialPortName.equals("")) scanForArduino();
-  else arduino = new Serial(this, serialPortName, 9600);
-  imageMode(CENTER);
-  ball = loadImage("ball.png");
-  bat_p1 = loadImage("bat.png");
-  bat_p2 = loadImage("bat.png");
-  back = loadImage("back.png");
-  f = createFont("Arial",16,true); // Arial, 16 point, anti-aliasing on
-  textFont(f,16);
-  minim = new Minim(this);
-  wallSound = minim.loadFile("wall.mp3");
-  batSound = minim.loadFile("bat.mp3");
-  bat_p1_Position = bat_p1.width/2;
-  bat_p2_Position = bat_p2.width/2;
-  resetBall();
+	// Window size
+	size(960,720);
+	// This if statement should not run, user should manually enter the port
+	if(port.equals("")) scanForArduino();
+	else arduino = new Serial(this, port, 9600);
+	// Image initialisation
+	imageMode(CENTER);
+	ball = loadImage("ball.png");
+	player1Bat = loadImage("bat.png");
+	player2Bat = loadImage("bat.png");
+	background = loadImage("background.png");
+	// Font initialisation
+	f = createFont("Arial",16,true);
+	textFont(f,16);
+	// Both bats should be placed in the middle of their areas
+	player1Bat_Position = player1Bat.width / 2;
+	player2Bat_Position = player2Bat.width / 2;
+	resetBall();
 }
 
+// Needs improvement but current system works
 void resetBall()
 {
   ballX = 480;
   ballY = 360;
-  vertSpeed = random(-12,12);
-  horiSpeed = random(-6,6);
+  vertical = random(-12,12);
+  horizontal = random(-6,6);
 }
 
 void draw()
 {
-  image(back,width/2,height/2,width,height);
-  text("Score player1: "+p1_score+"\nScore player2: "+p2_score,10,100);
+  image(background,width/2,height/2,width,height);
+  text("Score player1: "+p1Score+"\nScore player2: "+p2Score,10,100);
   count++;
   // increase the velocity
   if (count==200) {
     count=0;
-    if (vertSpeed<0) { vertSpeed--; }
-    if (vertSpeed>0) { vertSpeed++; }
+    if (vertical<0) { vertical--; }
+    if (vertical>0) { vertical++; }
   }
   // Move the bat
   if((arduino != null) && (arduino.available()>0)) {
@@ -57,66 +69,67 @@ void draw()
     if(message != null) {
       value = split(message, '|');
       if (value.length==2) {
-        bat_p1_Position = map(int(trim(value[0])),0,1024,0,width);
-        bat_p2_Position = map(int(trim(value[1])),0,1024,0,width);
+        player1Bat_Position = map(int(trim(value[0])),0,1024,0,width);
+        player2Bat_Position = map(int(trim(value[1])),0,1024,0,width);
       }
     }
   }
   
   // Draw the bats
-  image(bat_p1,bat_p1_Position,height-bat_p1.height);
-  image(bat_p2,bat_p2_Position,bat_p2.height);
+  image(player1Bat,player1Bat_Position,height-player1Bat.height);
+  image(player2Bat,player2Bat_Position,player2Bat.height);
   
   
 
   // Calculate new position of ball - being sure to keep it on screen
-  ballX = ballX + horiSpeed;
-  ballY = ballY + vertSpeed;
-  if(ballY >= height) { p1_score++; resetBall(); }
-  if(ballY <= 0) { p2_score++; resetBall(); }
+  ballX = ballX + horizontal;
+  ballY = ballY + vertical;
+  if(ballY >= height) { p1Score++; resetBall(); }
+  if(ballY <= 0) { p2Score++; resetBall(); }
   if(ballX >= width) wallBounce();
   if(ballX <= 0) wallBounce();
 
   // Draw the ball in the correct position and orientation
   translate(ballX,ballY);
-  if(vertSpeed > 0) rotate(-sin(horiSpeed/vertSpeed));
-  else rotate(PI-sin(horiSpeed/vertSpeed));
+  if(vertical > 0) rotate(-sin(horizontal/vertical));
+  else rotate(PI-sin(horizontal/vertical));
   image(ball,0,0);
   
   // Do collision detection between bat and ball
-  if(bat_p1_TouchingBall()) {
-    float distFromBat_p1_Center = bat_p1_Position-ballX;
-    horiSpeed = -distFromBat_p1_Center/10;
-    vertSpeed = -vertSpeed;
-    ballY = height-(bat_p1.height*2);
+  if(player1Bat_TouchingBall()) {
+    float distFromBat_p1_Center = player1Bat_Position-ballX;
+    horizontal = -distFromBat_p1_Center/10;
+    vertical = -vertical;
+    ballY = height-(player1Bat.height*2);
     
   }
   
-  if(bat_p2_TouchingBall()) {
-    float distFromBat_p2_Center = bat_p2_Position-ballX;
-    horiSpeed = -distFromBat_p2_Center/10;
-    vertSpeed = -vertSpeed;
-    ballY = (bat_p2.height*2);
+  if(player2Bat_TouchingBall()) {
+    float distFromBat_p2_Center = player2Bat_Position-ballX;
+    horizontal = -distFromBat_p2_Center/10;
+    vertical = -vertical;
+    ballY = (player2Bat.height*2);
     
   }
   
 }
 
-boolean bat_p1_TouchingBall()
+boolean player1Bat_TouchingBall()
 {
-  float distFromBat_p1_Center = bat_p1_Position-ballX;
-  return (ballY > height-(bat_p1.height*2)) && (ballY < height-(bat_p1.height/2)) && (abs(distFromBat_p1_Center)<bat_p1.width/2);
+  float distFromBat_p1_Center = player1Bat_Position-ballX;
+  return (ballY > height-(player1Bat.height*2)) && (ballY < height-(player1Bat.height/2)) && (abs(distFromBat_p1_Center)<player1Bat.width/2);
 }
 
-boolean bat_p2_TouchingBall()
+boolean player2Bat_TouchingBall()
 {
-  float distFromBat_p2_Center = bat_p2_Position-ballX;
-  return (ballY < (bat_p2.height*2)) && (ballY > (bat_p2.height/2)) && (abs(distFromBat_p2_Center)<bat_p2.width/2);
+  float distFromBat_p2_Center = player2Bat_Position-ballX;
+  return (ballY < (player2Bat.height*2)) && (ballY > (player2Bat.height/2)) && (abs(distFromBat_p2_Center)<player2Bat.width/2);
 }
 
+// Multiply angle by -1 when the ball bounces off a wall
 void wallBounce()
 {
-  horiSpeed = -horiSpeed;
+  horizontal = -horizontal;
   
 }
 
